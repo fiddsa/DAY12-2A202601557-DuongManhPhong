@@ -12,7 +12,7 @@
 |-----|----------|
 | Họ và tên | Duong Manh Phong |
 | Mã học viên | 2A202601557 |
-| Repo | https://github.com/fiddsa/Day12-2A202601557-DuongManhPhong |
+| Repo | https://github.com/fiddsa/DAY12-2A202601557-DuongManhPhong.git |
 
 ## Service
 
