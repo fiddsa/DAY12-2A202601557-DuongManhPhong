@@ -10,17 +10,17 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| Họ và tên | (điền họ tên) |
-| Mã học viên | (điền mã học viên) |
-| Repo | (điền link repo DAY12-...) |
+| Họ và tên | Duong Manh Phong |
+| Mã học viên | 2A202601557 |
+| Repo | https://github.com/fiddsa/Day12-2A202601557-DuongManhPhong |
 
 ## Service
 
 | Mục | Nội dung |
 |-----|----------|
-| Public URL | https://TODO-thay-bang-url-that.up.railway.app |
-| Platform | Railway / Render / Cloud Run — (điền platform bạn dùng) |
-| Ngày deploy | (điền ngày) |
+| Public URL | CHƯA DEPLOY — cần điền URL thật sau khi kết nối Railway/Render |
+| Platform | Railway (workflow đã chuẩn bị) |
+| Ngày deploy | Chưa deploy |
 
 ## Biến Môi Trường Đã Set Trên Cloud
 
