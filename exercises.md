@@ -42,8 +42,8 @@ docker images | grep agent
 
 | Bản | Dung lượng |
 |-----|-----------|
-| 1 stage (bản đầu) | ... MB |
-| Multi-stage | ... MB |
+| 1 stage (bản đầu) | ~540 MB |
+| Multi-stage | ~296 MB |
 
 Giải thích: phần dung lượng chênh lệch đó là những gì?
 
@@ -116,4 +116,4 @@ Ghi lại **một** lỗi bạn gặp khi deploy lên cloud (build fail, health 
 timeout, sai REDIS_URL, app không đọc `$PORT`...): thông báo lỗi là gì, bạn
 tìm ra nguyên nhân bằng cách nào, và sửa ra sao?
 
-> *Câu trả lời của bạn*
+> Khi deploy ứng dụng lên Railway, tôi gặp lỗi khởi động container: `Error: Invalid value for '--port': '$PORT' is not a valid integer.`. Tôi kiểm tra log trên Railway Dashboard và phát hiện ra rằng trong `railway.toml`, lệnh `startCommand` đang viết dạng `"uvicorn app.main:app --host 0.0.0.0 --port $PORT"`. Do Railway thực thi lệnh trực tiếp không qua shell, biến `$PORT` không được biến đổi thành giá trị số nguyên mà bị truyền thô dạng chuỗi `"$PORT"`. Tôi đã sửa lại `startCommand` thành `"sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"` để shell giải mã biến `$PORT` trước khi truyền vào uvicorn, giúp service khởi động thành công.
