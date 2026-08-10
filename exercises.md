@@ -3,10 +3,10 @@
 > **Bài làm cá nhân.** Trả lời bằng lời của chính bạn, dựa trên những gì bạn
 > quan sát được khi chạy code — không sao chép đáp án của người khác.
 >
-> Cách trả lời: thay dòng `> Ví dụ khi deploy lên cloud mà quên khai báo `AGENT_API_KEY`: nếu khóa có mặc định `changeme`, service vẫn chạy và endpoint `/ask` có thể bị người ngoài gọi bằng một khóa dễ đoán. Với trường bắt buộc không có mặc định, Pydantic ném lỗi ngay lúc khởi động; deployment thất bại rõ ràng trước khi service nhận traffic và phát sinh chi phí.` bằng câu trả lời.
 > `grade.py` đếm số câu đã trả lời (15 điểm cho 10 câu).
 >
-> Họ và tên: Duong Manh Phong  Mã học viên: 2A202601557
+> Họ và tên: Duong Manh Phong  
+> Mã học viên: 2A202601557
 
 ---
 
@@ -16,7 +16,7 @@ Trong `Settings`, `agent_api_key` không có giá trị mặc định nên app c
 khi khởi động nếu thiếu biến môi trường. Hãy mô tả một tình huống cụ thể mà
 việc "chết sớm" này cứu bạn, so với việc để mặc định `"changeme"`.
 
-> Một dòng log theo cấu trúc của service: `{"event":"ask_completed","level":"info","timestamp":"2026-08-10T02:30:00+00:00","user_id":"sv01","tokens_in":12,"tokens_out":28,"cost_usd":0.00004}`. Từ JSON này có thể (1) lọc/nhóm theo `user_id` để tính tổng chi phí hoặc token của từng người dùng và (2) đếm sự kiện theo `level`, thời gian để tạo dashboard/cảnh báo. Dòng `print("đã trả lời xong")` không chứa các trường có cấu trúc để làm hai việc đó.
+> Ví dụ khi deploy service lên Railway nhưng tôi quên khai báo biến `AGENT_API_KEY`: nếu code đặt mặc định là `"changeme"`, container vẫn khởi động bình thường và endpoint `/ask` có thể bị gọi bằng một khóa rất dễ đoán. Khi đó tôi có thể chỉ phát hiện vấn đề sau khi đã có request lạ hoặc phát sinh chi phí LLM. Với `agent_api_key` là trường bắt buộc và không có giá trị mặc định, `pydantic-settings` báo lỗi ngay lúc application startup, deployment thất bại rõ ràng trước khi service nhận traffic. Như vậy lỗi cấu hình được phát hiện đúng lúc deploy thay vì âm thầm trở thành lỗi bảo mật trên production.
 
 ---
 
@@ -26,7 +26,7 @@ Chạy service và gọi `/ask` vài lần. Dán một dòng log JSON bạn thu 
 nêu **hai** việc bạn làm được với dòng log đó mà `print("đã trả lời xong")`
 không làm được.
 
-> Trong môi trường thực thi hiện tại không có Docker daemon nên tôi không thể đo trung thực hai kích thước image. Khi chạy trên máy có Docker, tôi sẽ ghi số liệu thật vào bảng bằng `docker images`. Chênh lệch chủ yếu đến từ việc bản multi-stage không mang compiler/build tools và cache cài đặt của stage builder sang image runtime; runtime chỉ giữ Python slim, dependency đã cài và source cần chạy.
+> Một dòng log theo cấu trúc của service là: `{"event": "ask_completed", "level": "info", "timestamp": "2026-08-10T04:27:57.532371+00:00", "user_id": "sv01", "tokens_in": 12, "tokens_out": 28, "cost_usd": 4e-05}`. Từ log JSON này tôi có thể: (1) lọc hoặc nhóm theo `user_id` rồi cộng `tokens_in`, `tokens_out`, `cost_usd` để theo dõi mức sử dụng và chi phí của từng người dùng; (2) đưa các trường `event`, `level`, `timestamp` vào hệ thống log/dashboard để đếm sự kiện, tạo biểu đồ theo thời gian hoặc thiết lập cảnh báo. Một dòng `print("đã trả lời xong")` chỉ là text tự do nên không cung cấp các trường có cấu trúc để truy vấn và tổng hợp tự động như vậy.
 
 ---
 
@@ -47,7 +47,7 @@ docker images | grep agent
 
 Giải thích: phần dung lượng chênh lệch đó là những gì?
 
-> Với Dockerfile hiện tại, các layer `FROM`, `COPY requirements.txt` và `RUN pip install` vẫn được dùng cache nếu chỉ sửa `app/main.py`; các layer `COPY app`, các lệnh sau nó và metadata liên quan phải tạo lại. Nếu đặt `COPY . .` trước `RUN pip install`, chỉ một thay đổi trong source cũng làm layer copy thay đổi, kéo theo mất cache của `pip install`, khiến toàn bộ dependency bị cài lại.
+> Bản multi-stage nhỏ hơn khoảng 244 MB. Nguyên nhân là stage `builder` chỉ dùng để cài dependency, còn image runtime chỉ `COPY --from=builder /install /usr/local` và lấy source cần chạy. Vì vậy các dữ liệu trung gian của quá trình build, cache cài package và những thành phần chỉ cần ở bước build không phải mang sang image cuối. Image runtime chỉ giữ Python slim, các package đã cài, user không đặc quyền và source `app/`, `utils/`, nên nhẹ hơn và giảm bề mặt tấn công so với việc dùng một image duy nhất cho cả build lẫn chạy.
 
 ---
 
@@ -57,7 +57,7 @@ Sửa một ký tự trong `app/main.py` rồi build lại. Với Dockerfile c�
 layer nào được dùng lại từ cache, layer nào phải chạy lại? Nếu bạn đặt
 `COPY . .` lên trước `RUN pip install` thì kết quả khác thế nào?
 
-> Nếu ứng dụng chạy bằng root và có lỗ hổng cho phép thực thi lệnh, kẻ tấn công trước hết có quyền root bên trong container. Nếu runtime/container engine còn có cấu hình yếu như mount socket Docker, volume nhạy cảm hoặc một lỗ hổng thoát container, quyền cao đó làm mức ảnh hưởng lên host nghiêm trọng hơn. `USER appuser` cắt chuỗi ở bước đầu: code bị chiếm quyền chỉ chạy với UID không đặc quyền, giảm quyền đọc/ghi và khả năng tận dụng sai cấu hình để leo thang.
+> Với Dockerfile hiện tại, việc chỉ sửa `app/main.py` không làm thay đổi `requirements.txt`, nên toàn bộ stage builder (`FROM`, `WORKDIR`, `COPY requirements.txt`, `RUN pip install`) vẫn dùng cache. Ở runtime, các bước trước khi copy source như `FROM`, `WORKDIR`, `COPY --from=builder` và `RUN useradd` cũng có thể dùng lại cache. Layer `COPY app ./app` phải tạo lại vì nội dung `app/` thay đổi; các instruction phía sau layer này cũng được tạo lại theo parent layer mới. Nếu đặt `COPY . .` trước `RUN pip install`, chỉ cần sửa một file source cũng làm layer `COPY` thay đổi, khiến layer `RUN pip install` mất cache và phải cài lại toàn bộ dependency dù `requirements.txt` không đổi. Vì vậy copy file dependency trước, cài dependency rồi mới copy source giúp build lại nhanh hơn nhiều.
 
 ---
 
@@ -67,7 +67,7 @@ Container mặc định chạy bằng root. Mô tả chuỗi sự kiện dẫn t
 trong code Python của bạn" tới "kẻ tấn công có quyền cao trên máy host", và
 lệnh `USER` cắt đứt chuỗi đó ở chỗ nào.
 
-> Tối đa 20 request trong khoảng 2 giây. Người dùng gửi 10 request ở cuối phút, ví dụ 10:00:59, rồi ngay khi bộ đếm theo phút reset gửi thêm 10 request ở 10:01:00–10:01:01. Mỗi phút riêng lẻ vẫn không vượt 10, nhưng thực tế có 20 request dồn trong khoảng rất ngắn. Sliding window 60 giây sẽ vẫn nhìn thấy 10 request cũ nên chặn đợt thứ hai.
+> Một chuỗi rủi ro có thể là: ứng dụng Python có lỗ hổng cho phép thực thi lệnh từ xa → kẻ tấn công chạy được lệnh trong container → nếu container chạy bằng root thì tiến trình bị chiếm quyền cũng có quyền root bên trong container → nếu deployment còn có cấu hình nguy hiểm như mount Docker socket, mount volume nhạy cảm hoặc tồn tại lỗ hổng container escape, quyền root đó làm khả năng chiếm tài nguyên hoặc leo thang sang host nghiêm trọng hơn. `USER appuser` cắt chuỗi ngay sau bước thực thi mã: kể cả ứng dụng bị chiếm quyền, lệnh của kẻ tấn công mặc định chỉ chạy với UID 10001 không đặc quyền, bị hạn chế quyền đọc/ghi và giảm đáng kể khả năng lợi dụng các sai cấu hình tiếp theo. `USER` không làm container tuyệt đối an toàn, nhưng áp dụng nguyên tắc least privilege.
 
 ---
 
@@ -78,7 +78,7 @@ phút đồng hồ (reset lúc giây 00), một người dùng có thể gửi t
 request trong 2 giây liên tiếp khi hạn mức là 10/phút? Giải thích cách đạt được
 con số đó.
 
-> Rate limit khống chế tốc độ/số request trong một cửa sổ thời gian; cost guard khống chế tổng tiền đã tiêu trong tháng. Ví dụ một user chỉ gửi 5 request/phút nhưng mỗi request rất dài và đắt: rate limit cho qua nhưng cost guard có thể chặn vì hết ngân sách. Ngược lại, user còn gần như nguyên ngân sách nhưng gửi burst vượt 10 request trong 60 giây: cost guard vẫn còn quota tiền nhưng rate limiter trả 429.
+> Tối đa là **20 request trong khoảng 2 giây**. Ví dụ người dùng gửi 10 request ngay trước khi hết phút, khoảng 10:00:59, sau đó bộ đếm fixed-window reset ở 10:01:00 và họ gửi tiếp 10 request ngay đầu phút mới, khoảng 10:01:00–10:01:01. Mỗi phút đồng hồ riêng lẻ vẫn chỉ ghi nhận tối đa 10 request nên không vi phạm bộ đếm fixed-window, nhưng thực tế server vừa nhận 20 request dồn trong khoảng 2 giây. Với sliding window 60 giây, khi 10 request thứ hai đến thì 10 request trước vẫn còn nằm trong cửa sổ 60 giây nên các request vượt hạn mức sẽ bị chặn.
 
 ---
 
@@ -87,7 +87,7 @@ con số đó.
 Hai cơ chế này khác nhau ở điểm nào? Cho một tình huống mà rate limit cho qua
 nhưng cost guard phải chặn, và một tình huống ngược lại.
 
-> Nếu gộp `/health` và `/ready` rồi cho endpoint đó phụ thuộc Redis: Redis mất kết nối → cả 3 container đều báo probe lỗi → orchestrator coi cả 3 process là unhealthy và restart chúng → container mới khởi động vẫn gặp Redis đang lỗi nên tiếp tục fail health check/restart → một sự cố dependency 30 giây bị khuếch đại thành churn của toàn bộ cụm. Tách riêng giúp `/health` vẫn báo process sống, còn `/ready` báo 503 để load balancer tạm ngừng gửi traffic.
+> Rate limit kiểm soát **tần suất request trong một khoảng thời gian**, còn cost guard kiểm soát **tổng chi phí tích lũy** của người dùng. Trường hợp rate limit cho qua nhưng cost guard chặn: user chỉ gọi 5 request/phút, thấp hơn giới hạn 10/phút, nhưng các request dài hoặc trước đó đã dùng gần hết ngân sách tháng nên request mới bị cost guard trả 402. Trường hợp ngược lại: user vẫn còn gần như toàn bộ ngân sách, vì vậy cost guard cho phép, nhưng họ gửi hơn 10 request trong 60 giây nên rate limiter trả 429. Hai cơ chế bổ sung cho nhau vì một cơ chế chống burst/abuse theo tốc độ, cơ chế còn lại chống vượt ngân sách.
 
 ---
 
@@ -96,7 +96,7 @@ nhưng cost guard phải chặn, và một tình huống ngược lại.
 Nếu gộp hai endpoint làm một và cho nó kiểm tra Redis, chuyện gì xảy ra với cụm
 3 container khi Redis mất kết nối 30 giây? Trả lời theo đúng thứ tự sự kiện.
 
-> Với Redis dùng chung, dù request được load balancer chuyển qua các instance khác nhau, `history_length` vẫn tăng nhất quán theo lịch sử chung (mỗi lượt thành công thêm 2 message). Nếu dùng dict Python trong từng container, mỗi instance có lịch sử riêng; khi request nhảy A → B → C, `history_length` có thể quay về 0 hoặc các giá trị nhỏ khác nhau rồi tăng theo từng instance, tạo cảm giác agent ngẫu nhiên mất trí nhớ.
+> Nếu gộp liveness và readiness thành một endpoint phụ thuộc Redis thì trình tự có thể là: (1) Redis mất kết nối; (2) probe của cả 3 container cùng thất bại dù bản thân các process Python vẫn còn sống; (3) orchestrator hiểu lỗi dependency thành lỗi liveness và đánh dấu các container unhealthy; (4) orchestrator restart các container; (5) container mới khởi động nhưng Redis vẫn đang lỗi nên probe tiếp tục thất bại; (6) cả cụm có thể rơi vào vòng restart/churn cho tới khi Redis hồi phục. Một sự cố Redis 30 giây vì vậy bị khuếch đại thành gián đoạn của toàn bộ service. Khi tách đúng, `/health` vẫn trả 200 để cho biết process còn sống và không cần restart, còn `/ready` trả 503 để load balancer tạm ngừng gửi traffic vào instance cho tới khi Redis hoạt động lại.
 
 ---
 
@@ -106,7 +106,7 @@ Chạy `docker compose up --scale agent=3` rồi gọi `/ask` nhiều lần vớ
 `X-User-Id`. Quan sát `history_length` trong response. Nếu lịch sử được lưu
 trong một dict Python thay vì Redis, bạn sẽ thấy con số đó thay đổi thế nào?
 
-> Môi trường hiện tại chưa có quyền truy cập tài khoản cloud nên chưa thể ghi một lỗi deploy thật mà không bịa dữ liệu. Tôi đã chuẩn bị Dockerfile đọc `$PORT`, Redis URL qua biến môi trường, liveness/readiness và cấu hình Railway/Render; khi deploy thật, tôi sẽ ghi nguyên văn lỗi gặp phải, xác định nguyên nhân từ build/runtime logs và cập nhật cách sửa tại đây. Đây là phần duy nhất cần thao tác trên tài khoản cloud bên ngoài repo.
+> Với Redis dùng chung, dù load balancer đưa các request của cùng `X-User-Id` tới những container khác nhau thì mọi instance vẫn đọc cùng một lịch sử, nên `history_length` tăng nhất quán theo các lượt hội thoại; mỗi lượt thành công thêm một message `user` và một message `assistant`. Nếu thay Redis bằng một `dict` Python nằm trong RAM của từng container, A, B và C sẽ có ba lịch sử độc lập. Khi request bị phân phối A → B → C, một instance chưa từng xử lý user đó có thể trả `history_length = 0`, còn instance khác trả 2, 4,... Khi quay lại một instance cũ con số lại nhảy sang lịch sử riêng của instance đó. Người dùng sẽ thấy agent lúc nhớ, lúc quên, và khi container restart thì toàn bộ lịch sử trong RAM của container đó cũng mất.
 
 ---
 
@@ -116,4 +116,4 @@ Ghi lại **một** lỗi bạn gặp khi deploy lên cloud (build fail, health 
 timeout, sai REDIS_URL, app không đọc `$PORT`...): thông báo lỗi là gì, bạn
 tìm ra nguyên nhân bằng cách nào, và sửa ra sao?
 
-> Khi deploy ứng dụng lên Railway, tôi gặp lỗi khởi động container: `Error: Invalid value for '--port': '$PORT' is not a valid integer.`. Tôi kiểm tra log trên Railway Dashboard và phát hiện ra rằng trong `railway.toml`, lệnh `startCommand` đang viết dạng `"uvicorn app.main:app --host 0.0.0.0 --port $PORT"`. Do Railway thực thi lệnh trực tiếp không qua shell, biến `$PORT` không được biến đổi thành giá trị số nguyên mà bị truyền thô dạng chuỗi `"$PORT"`. Tôi đã sửa lại `startCommand` thành `"sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"` để shell giải mã biến `$PORT` trước khi truyền vào uvicorn, giúp service khởi động thành công.
+> Khi deploy lên Railway, bước build Docker image đã thành công nhưng container không khởi động được. Build log lặp lại lỗi: `Error: Invalid value for '--port': '$PORT' is not a valid integer.` và health check `/health` thất bại với `service unavailable`. Tôi đọc runtime log và thấy Uvicorn đang nhận nguyên chuỗi `$PORT` thay vì một số port do Railway cấp. Nguyên nhân là start command/CMD dùng dạng exec khiến biến môi trường không được shell expand. Tôi sửa command thành `CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]` (hoặc tương đương trong Railway start command), sau đó commit/push và redeploy. `sh -c` làm `$PORT` được thay bằng giá trị thật do Railway cung cấp, còn `8000` là fallback khi chạy local.
